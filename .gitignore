@@ -1,0 +1,6 @@
+_site/
+_work/
+__pycache__/
+.claude/
+collector.txt
+.DS_Store
