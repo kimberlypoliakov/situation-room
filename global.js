@@ -240,8 +240,8 @@ function renderCyberPanels(){
   $("ws-meta").innerHTML = `<span class="chip ${ss.every(s => s.ok) ? "ok" : "warn"}">${ss.filter(s => s.ok).length}/${ss.length} עונים</span>`;
 }
 const LIVE_MAPS = {
-  radware: ["https://livethreatmap.radware.com/", "מפה חיה של Radware, מרשת החיישנים שלה. נטענת מהאתר שלהם ומתעדכנת שם בזמן אמת."],
-  kaspersky: ["https://cybermap.kaspersky.com/en/widget/dynamic/dark", "מפה חיה של Kaspersky: נוזקות, סריקות ותקיפות רשת שהמוצרים שלה מזהים בעולם, בזמן אמת."],
+  radware: ["https://livethreatmap.radware.com/", "מפה חיה של Radware, מרשת החיישנים שלה. נטענת מהאתר שלהם ומתעדכנת שם בזמן אמת.", "https://livethreatmap.radware.com/"],
+  kaspersky: ["https://cybermap.kaspersky.com/en/widget/dynamic/dark", "מפה חיה של Kaspersky: נוזקות, סריקות ותקיפות רשת שהמוצרים שלה מזהים בעולם, בזמן אמת. המפה המלאה (תלת־ממד, סטטיסטיקה לפי מדינה) נפתחת רק באתר שלהם.", "https://cybermap.kaspersky.com/"],
 };
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-cm]"); if (!b) return;
@@ -249,7 +249,7 @@ document.addEventListener("click", e => {
   const m = LIVE_MAPS[b.dataset.cm];
   $("cm-ours").hidden = !!m; $("cm-live").hidden = !m;
   if (m) { if ($("cm-frame").getAttribute("src") !== m[0]) $("cm-frame").src = m[0];
-    $("cm-live-note").innerHTML = `${esc(m[1])} <a href="${m[0]}" target="_blank" rel="noopener">לפתיחה במסך מלא</a>`; }
+    $("cm-live-note").innerHTML = `${esc(m[1])} <a href="${m[2]}" target="_blank" rel="noopener">לפתיחת המפה המלאה ↗</a>`; }
   else if (cmap) cmap.build();
 });
 
