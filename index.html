@@ -549,16 +549,22 @@ details.more[open]>*+*{margin-top:12px}
     </section>
     <section class="panel" aria-labelledby="h-cm">
       <div class="ph"><h2 id="h-cm">מפת תקיפות סייבר</h2>
-        <div class="tabs" role="group" aria-label="סוג מפה"><button type="button" data-cm="ours" aria-pressed="true">נתונים שנאספו</button><button type="button" data-cm="live" aria-pressed="false">שידור חי · Radware</button></div></div>
+        <div class="tabs" role="group" aria-label="סוג מפה"><button type="button" data-cm="ours" aria-pressed="true">נתונים שנאספו</button><button type="button" data-cm="radware" aria-pressed="false">חי · Radware</button><button type="button" data-cm="kaspersky" aria-pressed="false">חי · Kaspersky</button></div></div>
       <div id="cm-ours">
         <div class="maptools" id="cm-layers" role="group" aria-label="שכבות"></div>
         <div class="gmap cyber" id="cm"><div class="empty" style="padding:20px">טוען מפה…</div></div>
         <div class="cmfoot"><div class="lbl" id="cm-note"></div><div class="ctop" id="cm-top"></div></div>
       </div>
       <div id="cm-live" hidden>
-        <div class="live-wrap"><iframe id="cm-frame" title="מפת התקפות חיה של Radware" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin"></iframe></div>
-        <div class="lbl" style="padding:8px 14px 12px">מפה חיה של חברת Radware, מבוססת על רשת החיישנים שלה. היא נטענת מהאתר שלהם ומתעדכנת שם בזמן אמת. <a href="https://livethreatmap.radware.com/" target="_blank" rel="noopener">לפתיחה במסך מלא</a></div>
+        <div class="live-wrap"><iframe id="cm-frame" title="מפת תקיפות חיה" loading="lazy" referrerpolicy="no-referrer" sandbox="allow-scripts allow-same-origin"></iframe></div>
+        <div class="lbl" style="padding:8px 14px 12px" id="cm-live-note"></div>
       </div>
+    </section>
+    <section class="panel" aria-labelledby="h-up">
+      <div class="ph"><h2 id="h-up">קריסות ותקלות בפלטפורמות · בזמן אמת</h2><span class="meta" id="up-meta"></span></div>
+      <div class="pb"><div class="upgrid" id="up"><div class="empty">בודק…</div></div>
+        <div class="scroll-y" style="max-height:300px;margin-top:10px"><ul class="list" id="up-inc"></ul></div>
+        <div class="lbl" style="margin-top:8px">נבדק ישירות מדפי הסטטוס הרשמיים של כל פלטפורמה, מהדפדפן שלך, כל דקה. מה שהחברה עצמה הודתה בו בלבד.</div></div>
     </section>
     <div class="grid3">
       <section class="panel" aria-labelledby="h-rw">

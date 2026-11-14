@@ -239,14 +239,57 @@ function renderCyberPanels(){
   $("ws").innerHTML = ss.map(s => `<span class="dot ${s.ok ? "ok" : "crit"}"></span><span>${esc(s.name)}</span><span class="lbl num">${s.ok ? (s.ms / 1000).toFixed(1) + "s" : "לא ענה"}</span>`).join("");
   $("ws-meta").innerHTML = `<span class="chip ${ss.every(s => s.ok) ? "ok" : "warn"}">${ss.filter(s => s.ok).length}/${ss.length} עונים</span>`;
 }
+const LIVE_MAPS = {
+  radware: ["https://livethreatmap.radware.com/", "מפה חיה של Radware, מרשת החיישנים שלה. נטענת מהאתר שלהם ומתעדכנת שם בזמן אמת."],
+  kaspersky: ["https://cybermap.kaspersky.com/en/widget/dynamic/dark", "מפה חיה של Kaspersky: נוזקות, סריקות ותקיפות רשת שהמוצרים שלה מזהים בעולם, בזמן אמת."],
+};
 document.addEventListener("click", e => {
   const b = e.target.closest("[data-cm]"); if (!b) return;
   document.querySelectorAll("[data-cm]").forEach(x => x.setAttribute("aria-pressed", x === b));
-  const live = b.dataset.cm === "live";
-  $("cm-ours").hidden = live; $("cm-live").hidden = !live;
-  if (live && !$("cm-frame").src) $("cm-frame").src = "https://livethreatmap.radware.com/";
-  if (!live && cmap) cmap.build();
+  const m = LIVE_MAPS[b.dataset.cm];
+  $("cm-ours").hidden = !!m; $("cm-live").hidden = !m;
+  if (m) { if ($("cm-frame").getAttribute("src") !== m[0]) $("cm-frame").src = m[0];
+    $("cm-live-note").innerHTML = `${esc(m[1])} <a href="${m[0]}" target="_blank" rel="noopener">לפתיחה במסך מלא</a>`; }
+  else if (cmap) cmap.build();
 });
+
+/* ---------- live platform outages: official status pages, fetched by the browser every minute ---------- */
+const SP = [["ChatGPT", "status.openai.com"], ["Claude", "status.claude.com"], ["GitHub", "www.githubstatus.com"], ["Cloudflare", "www.cloudflarestatus.com"],
+  ["Discord", "discordstatus.com"], ["Reddit", "www.redditstatus.com"], ["Zoom", "www.zoomstatus.com"], ["Shopify", "www.shopifystatus.com"],
+  ["Atlassian", "status.atlassian.com"], ["Twitch", "status.twitch.com"], ["Epic Games", "status.epicgames.com"], ["Figma", "status.figma.com"],
+  ["Coinbase", "status.coinbase.com"], ["Vercel", "www.vercel-status.com"], ["DigitalOcean", "status.digitalocean.com"], ["npm", "status.npmjs.org"]];
+const IMP = {none: 0, minor: 1, major: 2, critical: 3, maintenance: 0};
+const ST_HE = {operational: "תקין", degraded_performance: "איטי", partial_outage: "תקלה חלקית", major_outage: "קריסה", under_maintenance: "תחזוקה"};
+const getJ = (u, ms = 9000) => fetch(u, {signal: AbortSignal.timeout(ms), cache: "no-store"}).then(r => r.ok ? r.json() : Promise.reject(r.status));
+async function pollStatus(){
+  const out = await Promise.all([
+    ...SP.map(([name, host]) => getJ(`https://${host}/api/v2/summary.json`).then(j => {
+      const bad = (j.components || []).filter(c => c.status && c.status !== "operational" && !c.group);
+      const inc = (j.incidents || []).filter(i => i.status !== "resolved" && i.status !== "postmortem");
+      const lvl = Math.max(IMP[j.status?.indicator] ?? 0, ...inc.map(i => IMP[i.impact] ?? 1), ...bad.map(c => c.status === "major_outage" ? 3 : c.status === "partial_outage" ? 2 : c.status === "under_maintenance" ? 0 : 1));
+      return {name, url: j.page?.url || `https://${host}`, ok: true, lvl, bad, inc: inc.map(i => ({name: i.name, t: i.updated_at || i.created_at, imp: i.impact, st: i.status, url: i.shortlink || j.page?.url}))};
+    }).catch(() => ({name, url: `https://${host}`, ok: false, lvl: -1, bad: [], inc: []}))),
+    getJ("https://slack-status.com/api/v2.0.0/current").then(j => {
+      const inc = (j.active_incidents || []);
+      return {name: "Slack", url: "https://slack-status.com", ok: true, lvl: inc.some(i => i.type === "outage") ? 3 : inc.length ? 1 : 0, bad: [], inc: inc.map(i => ({name: i.title, t: i.date_updated, imp: i.type, st: i.status, url: i.url}))};
+    }).catch(() => ({name: "Slack", url: "https://slack-status.com", ok: false, lvl: -1, bad: [], inc: []})),
+    getJ("https://www.google.com/appsstatus/dashboard/incidents.json").then(j => {
+      const inc = (j || []).filter(i => !i.end);
+      return {name: "Google Workspace", url: "https://www.google.com/appsstatus/dashboard/", ok: true, lvl: inc.some(i => i.severity === "high") ? 3 : inc.length ? 1 : 0, bad: [],
+        inc: inc.map(i => ({name: (i.affected_products || []).map(p => p.title).join(", ") + " · " + (i.external_desc || "").split("\n")[0], t: i.modified, imp: i.severity, st: "", url: "https://www.google.com/appsstatus/dashboard/" + (i.uri || "")}))};
+    }).catch(() => ({name: "Google Workspace", url: "https://www.google.com/appsstatus/dashboard/", ok: false, lvl: -1, bad: [], inc: []})),
+  ]);
+  out.sort((a, b) => b.lvl - a.lvl || a.name.localeCompare(b.name));
+  const cls = l => l >= 3 ? "crit" : l >= 1 ? "warn" : l === 0 ? "ok" : "off";
+  const word = r => !r.ok ? "לא ענה" : r.lvl >= 3 ? "קריסה" : r.lvl === 2 ? "תקלה" : r.lvl === 1 ? "תקלה קלה" : "תקין";
+  $("up").innerHTML = out.map(r => `<a class="up ${r.lvl >= 3 ? "crit" : r.lvl >= 1 ? "warn" : ""}" href="${U(r.url)}" target="_blank" rel="noopener" title="${esc(r.bad.map(c => c.name + ": " + (ST_HE[c.status] || c.status)).join(" · "))}"><span class="dot ${cls(r.lvl)}"></span><span>${esc(r.name)}</span><small>${word(r)}</small></a>`).join("");
+  const incs = out.flatMap(r => r.inc.map(i => ({...i, p: r.name}))).sort((a, b) => String(b.t).localeCompare(String(a.t)));
+  $("up-inc").innerHTML = incs.length ? incs.map(i => `<li><a class="t ltr" href="${U(i.url)}" target="_blank" rel="noopener">${esc(i.name)}</a><span class="s"><span class="chip ${i.imp === "critical" || i.imp === "major" || i.imp === "outage" || i.imp === "high" ? "crit" : "warn"}">${esc(i.p)}</span>${i.st ? `<span>${esc(i.st)}</span>` : ""}${i.t ? `<span>${ago(Date.parse(i.t) / 1000)}</span>` : ""}</span></li>`).join("") : `<li class="empty">אין כרגע תקלות פתוחות באף פלטפורמה.</li>`;
+  const down = out.filter(r => r.lvl >= 1).length;
+  $("up-meta").innerHTML = `<span class="chip ${down ? "warn" : "ok"}">${down ? down + " עם תקלה" : "הכול תקין"}</span><span class="chip">נבדק ${new Date().toLocaleTimeString("he-IL", {hour: "2-digit", minute: "2-digit"})}</span>`;
+}
+let upTimer = null;
+function startStatus(){ if (upTimer) return; pollStatus(); upTimer = setInterval(() => { if (!document.hidden && !$("view-cyber").hidden) pollStatus(); }, 60000); }
 
 /* ---------- views ---------- */
 function regionNav(){
@@ -260,6 +303,7 @@ async function show(view){
   document.querySelectorAll(".view").forEach(v => v.hidden = v.id !== "view-" + view);
   document.querySelectorAll("[data-view]").forEach(a => a.setAttribute("aria-selected", a.dataset.view === view));
   if (view === "region") return;
+  if (view === "cyber") startStatus();
   try { await getAtlas(); } catch (e) { for (const id of ["wm", "cm"]) $(id).innerHTML = `<div class="empty" style="padding:20px">המפה לא נטענה. בדקי את החיבור ורענני.</div>`; return; }
   if (view === "world") { if (!wmap) { wmap = makeMap($("wm"), {onDraw: drawWorld}); layerButtons("wm-layers", W_LAYERS, WL, () => drawWorld(wmap)); } wmap.build(); }
   if (view === "cyber") { if (!cmap) { cmap = makeMap($("cm"), {cls: "cy", onDraw: drawCyber}); layerButtons("cm-layers", C_LAYERS, CL, () => drawCyber(cmap)); } cmap.build(); }
