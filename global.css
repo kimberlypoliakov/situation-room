@@ -87,3 +87,34 @@ body{background:radial-gradient(1200px 500px at 85% -10%,#132033 0%,transparent 
 .upgrid .up span{overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .upgrid .up small{margin-inline-start:auto;color:var(--dim);font-size:11px;white-space:nowrap}
 .upgrid .up.warn{border-color:var(--warn)} .upgrid .up.crit{border-color:var(--crit);background:color-mix(in srgb,var(--crit) 10%,transparent)}
+
+/* cyber globe */
+.gmap.cyber{min-height:340px;touch-action:pan-y}
+.gstage{position:relative;width:100%}
+.gstage canvas{display:block;cursor:grab;touch-action:pan-y}
+.gstage canvas:active{cursor:grabbing}
+.gctl{position:absolute;inset-inline-end:10px;top:10px;display:grid;gap:6px}
+.gctl button{width:32px;height:32px;border-radius:6px;border:1px solid var(--line-2);background:rgba(10,12,22,.8);color:var(--fg);font-size:16px;line-height:1;cursor:pointer}
+.gctl button:hover{border-color:var(--dim)}
+.gctl button[aria-pressed=true]{border-color:#ff4d6d;color:#ff8fa3}
+.gpanel{position:absolute;inset-inline-start:10px;top:10px;width:236px;max-width:calc(100% - 64px);background:rgba(10,12,22,.86);border:1px solid var(--line-2);border-radius:8px;padding:10px 12px;backdrop-filter:blur(6px);font-size:13px}
+.gph{display:flex;justify-content:space-between;align-items:center;gap:8px;margin-bottom:2px}
+.gph b{font-size:16px}
+.gph button{border:0;background:none;color:var(--dim);font-size:20px;line-height:1;cursor:pointer;padding:0 4px}
+.gph button:hover{color:var(--fg)}
+.gprs{margin-top:8px}
+.gpr{display:flex;justify-content:space-between;gap:10px;padding:4px 0;border-bottom:1px solid var(--line)}
+.gpr span{color:var(--c,var(--dim))}
+.gpr.ip span{color:var(--dim);direction:ltr}
+.gpf{margin-top:8px}
+.gbar{display:grid;grid-template-columns:repeat(auto-fit,minmax(118px,1fr));gap:1px;background:var(--line);border-top:1px solid var(--line)}
+.gbar>*{display:grid;gap:2px;justify-items:center;text-align:center;padding:9px 6px 8px;background:#0a0b14;border:0;border-bottom:2px solid var(--c);color:var(--fg);font:inherit}
+.gbar b{font-size:16px}
+.gbar span{font-size:11px;color:var(--c)}
+.gbar button{cursor:pointer}
+.gbar button:hover{background:#11121f}
+.gbar button[aria-pressed=false]{border-bottom-color:transparent;opacity:.45}
+button.chip{background:none;font-family:inherit;cursor:pointer}
+button.chip:hover{color:var(--fg);border-color:var(--dim)}
+.gctl button:focus-visible,.gbar button:focus-visible,.gph button:focus-visible,button.chip:focus-visible{outline:2px solid var(--accent);outline-offset:1px}
+@media (max-width:640px){.gpanel{position:static;width:auto;max-width:none;border-radius:0;border-inline:0;backdrop-filter:none}}

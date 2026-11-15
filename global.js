@@ -153,43 +153,186 @@ document.addEventListener("click", e => {
   const z = e.target.closest("[data-wz]"); if (z && wmap) { document.querySelectorAll("[data-wz]").forEach(x => x.setAttribute("aria-pressed", x === z)); wmap.zoomTo(BOXES[z.dataset.wz]); }
 });
 
-/* ---------- CYBER ---------- */
-const CL = {heat: true, scan: true, c2: true};
-const C_LAYERS = [["heat", "מדינות מקור", "var(--crit)"], ["scan", "כתובות שתוקפות עכשיו", "#ff4d6d"], ["c2", "שרתי שליטה של בוטנטים", "var(--site)"]];
+/* ---------- CYBER: rotating globe, country panel, counters bar ---------- */
+const CL = {scan: true, beam: true, c2: true, heat: true};
 let cmap = null;
 function cyLevel(s){ return s >= 60 ? ["גל תקיפות", "var(--crit)"] : s >= 35 ? ["פעילות גבוהה", "var(--warn)"] : s >= 15 ? ["פעילות רגילה", "var(--accent)"] : ["שקט יחסית", "var(--ok)"]; }
-function drawCyber(st){
-  const cy = WORLD?.cyber; if (!cy) return;
-  const geo = cy.geo || [];
-  const per = {};
-  const radar = cy.radar && cy.radar.origin && cy.radar.origin.length;
-  if (radar) for (const o of cy.radar.origin) { const n = ISO2[o.cc]; if (n) per[n] = o.pct; }
-  else for (const p of geo) { const n = ISO2[p.cc]; if (n) per[n] = (per[n] || 0) + (p.k === "scan" ? Math.log10(10 + (p.n || 0)) : 1); }
-  const mx = Math.max(1e-6, ...Object.values(per));
-  st.land.selectAll("path").attr("class", d => CL.heat && per[d.properties.name] ? "hot" : null)
-    .style("--heat", d => per[d.properties.name] ? (0.2 + 0.75 * Math.sqrt(per[d.properties.name] / mx)).toFixed(2) : null)
-    .on("pointerenter pointermove", (e, d) => { const n = d.properties.name; const ss = geo.filter(p => ISO2[p.cc] === n);
-      st.showTip(e, `<b>${esc(cname(n))}</b><div class="tt dim">${radar ? `${(per[n] || 0).toFixed(1)}% מתקיפות האפליקציה בעולם יצאו מכאן (Cloudflare)` : ss.length ? `${ss.filter(p => p.k === "scan").length} כתובות תוקפות · ${ss.filter(p => p.k === "c2").length} שרתי שליטה` : "לא נמדדה פעילות"}</div>`); })
-    .on("pointerleave", st.hideTip);
-  const pts = [];
-  for (const p of geo) {
-    if (p.k === "scan" && CL.scan) pts.push({k: "scan", lon: p.lon, lat: p.lat, r: 2 + Math.min(6, Math.log10(1 + (p.n || 1)) * 1.1), c: "#ff4d6d", cls: "pulse",
-      tip: `<b>כתובת שתוקפת עכשיו</b> · <span class="dim">${esc(cname(ISO2[p.cc] || p.cc || ""))}</span><div class="tt"><span class="num">${esc(p.ip)}</span> · ${(p.n || 0).toLocaleString("en-US")} דיווחים מחיישני DShield</div>`});
-    if (p.k === "c2" && CL.c2) pts.push({k: "c2", lon: p.lon, lat: p.lat, r: 3.2, c: "var(--site)", cls: p.on ? "pulse" : "",
-      tip: `<b>שרת שליטה של בוטנט</b> · <span class="dim">${esc(p.mw || "")} · ${p.on ? "פעיל" : "לא פעיל כרגע"}</span><div class="tt"><span class="num">${esc(p.ip)}</span> · ${esc(cname(ISO2[p.cc] || p.cc || ""))}</div>`});
+function makeGlobe(el){
+  const RM = matchMedia("(prefers-reduced-motion: reduce)").matches;
+  const st = {flat: false, k: 1, rot: [-30, -24], ty: 0, auto: !RM, hold: 0, sel: undefined, pts: [], agg: null, rank: [], hot: [], arcs: [], w: 0, h: 0, raf: 0, last: 0};
+  const GRAT = d3.geoGraticule10(), nf = v => Number(v || 0).toLocaleString("en-US");
+  let cv, ctx, stage, tip, panel, bar, land, borders, proj, path, hover = null, tween = null, drag = null, site = "#b18cff", lastMove = 0;
+  const feat = n => countries.find(f => f.properties.name === n);
+  function init(){
+    site = getComputedStyle(document.documentElement).getPropertyValue("--site").trim() || site;
+    land = topojson.feature(atlas, atlas.objects.land); borders = topojson.mesh(atlas, atlas.objects.countries, (a, b) => a !== b);
+    el.innerHTML = `<div class="gstage"><canvas aria-label="גלובוס תקיפות סייבר. גרירה מסובבת, לחיצה על מדינה פותחת את הנתונים שלה." role="img"></canvas>
+      <div class="gctl" role="group" aria-label="שליטה במפה">
+        <button type="button" data-g="flat" aria-pressed="false" title="מפה שטוחה / גלובוס" aria-label="מעבר בין גלובוס למפה שטוחה">▭</button>
+        <button type="button" data-g="in" title="הגדלה" aria-label="הגדלה">+</button>
+        <button type="button" data-g="out" title="הקטנה" aria-label="הקטנה">−</button>
+        <button type="button" data-g="auto" aria-pressed="${st.auto}" title="סיבוב אוטומטי" aria-label="סיבוב אוטומטי">⟳</button>
+      </div><div class="tip" hidden></div></div>
+      <aside class="gpanel" hidden aria-live="polite"></aside><div class="gbar" role="group" aria-label="סוגי נתונים"></div>`;
+    stage = el.querySelector(".gstage"); cv = el.querySelector("canvas"); ctx = cv.getContext("2d");
+    tip = el.querySelector(".tip"); panel = el.querySelector(".gpanel"); bar = el.querySelector(".gbar");
+    el.addEventListener("click", e => {
+      const g = e.target.closest("[data-g]"), l = e.target.closest("[data-gl]");
+      if (l) { CL[l.dataset.gl] = !CL[l.dataset.gl]; l.setAttribute("aria-pressed", CL[l.dataset.gl]); return kick(); }
+      if (!g) return;
+      const a = g.dataset.g;
+      if (a === "flat") { st.flat = !st.flat; st.ty = 0; g.setAttribute("aria-pressed", st.flat); g.textContent = st.flat ? "◍" : "▭"; }
+      if (a === "in") st.k = Math.min(6, st.k * 1.5);
+      if (a === "out") { st.k = Math.max(1, st.k / 1.5); if (st.k === 1) st.ty = 0; }
+      if (a === "auto") { st.auto = !st.auto; st.hold = 0; g.setAttribute("aria-pressed", st.auto); }
+      if (a === "close") { st.sel = null; renderPanel(); }
+      kick();
+    });
+    cv.addEventListener("pointerdown", e => { drag = {x: e.clientX, y: e.clientY, moved: 0}; cv.setPointerCapture(e.pointerId); tween = null; });
+    cv.addEventListener("pointermove", e => {
+      if (drag) {
+        const dx = e.clientX - drag.x, dy = e.clientY - drag.y; drag.x = e.clientX; drag.y = e.clientY; drag.moved += Math.abs(dx) + Math.abs(dy);
+        if (drag.moved > 4) { tip.hidden = true;
+          if (st.flat) { st.rot[0] += dx * 360 / (st.w * st.k); const m = st.h * (st.k - 1) / 2; st.ty = Math.max(-m, Math.min(m, st.ty + dy)); }
+          else { const s = 57.3 / proj.scale(); st.rot[0] += dx * s; st.rot[1] = Math.max(-80, Math.min(80, st.rot[1] - dy * s)); }
+          st.hold = performance.now() + 5000; kick(); }
+        return;
+      }
+      const now = performance.now(); if (now - lastMove < 40) return; lastMove = now;
+      const r = cv.getBoundingClientRect(), x = e.clientX - r.left, y = e.clientY - r.top, h = pick(x, y);
+      hover = h && h.f ? h.f : null; cv.style.cursor = h ? "pointer" : "grab";
+      if (h) { tip.innerHTML = h.html; tip.hidden = false; tip.style.left = x + "px"; tip.style.top = y + "px"; } else tip.hidden = true;
+      if (RM) kick();
+    });
+    cv.addEventListener("pointerup", e => { const d = drag; drag = null; if (!d || d.moved > 4) return;
+      const r = cv.getBoundingClientRect(), h = pick(e.clientX - r.left, e.clientY - r.top);
+      if (h && h.name) st.select(h.name); });
+    cv.addEventListener("pointerleave", () => { tip.hidden = true; hover = null; });
+    cv.addEventListener("wheel", e => { if (!(e.ctrlKey || e.metaKey)) return; e.preventDefault(); st.k = Math.max(1, Math.min(6, st.k * (e.deltaY < 0 ? 1.15 : 1 / 1.15))); kick(); }, {passive: false});
+    new ResizeObserver(() => { if (!el.closest(".view").hidden && Math.abs(el.clientWidth - st.w) > 3) st.build(); }).observe(el);
   }
-  renderPoints(st, pts);
-  // animated arcs from the busiest attack sources toward the busiest target countries (Cloudflare only: real origin -> target pairs are not published, so arcs show volume, not specific attacks)
-  st.g.selectAll("g.arcs").remove();
-  if (radar && cy.radar.target && cy.radar.target.length) {
-    const A = st.g.append("g").attr("class", "arcs");
-    const T = cy.radar.target.slice(0, 5).map(t => centroid[ISO2[t.cc]]).filter(Boolean);
-    const O = cy.radar.origin.slice(0, 6).map(o => centroid[ISO2[o.cc]]).filter(Boolean);
-    let i = 0;
-    for (const o of O) for (const t of T) { if (o === t) continue; const line = {type: "LineString", coordinates: [o, t]};
-      A.append("path").attr("d", st.path(line)).attr("class", "arc").style("--dl", (i++ % 9) * 0.45 + "s"); }
+  function setProj(){
+    const {w, h} = st;
+    if (st.flat) { proj = d3.geoNaturalEarth1().fitExtent([[8, 8], [w - 8, h - 8]], {type: "Sphere"}); const t = proj.translate(); proj.scale(proj.scale() * st.k).translate([t[0], t[1] + st.ty]).rotate([st.rot[0], 0]); }
+    else proj = d3.geoOrthographic().scale((Math.min(w, h) / 2 - 14) * st.k).translate([w / 2, h / 2]).rotate([st.rot[0], st.rot[1]]).clipAngle(90);
+    path = d3.geoPath(proj, ctx);
   }
+  const vis = ll => st.flat || d3.geoDistance(ll, [-st.rot[0], -st.rot[1]]) < 1.53;
+  function pick(x, y){
+    let best = null, bd = 100;
+    for (const p of st.pts) { if (!p._v || !CL[p.k]) continue; const d = (p._x - x) ** 2 + (p._y - y) ** 2; if (d < bd) { bd = d; best = p; } }
+    if (best) { const n = ISO2[best.cc] || best.cc || "";
+      return {name: centroid[n] ? n : null, html: best.k === "scan"
+        ? `<b>כתובת שתוקפת עכשיו</b> · <span class="dim">${esc(cname(n))}</span><div class="tt"><span class="num">${esc(best.ip)}</span> · ${nf(best.n)} דיווחים מחיישני DShield</div>`
+        : `<b>שרת שליטה של בוטנט</b> · <span class="dim">${esc(best.mw || "")} · ${best.on ? "פעיל" : "לא פעיל כרגע"}</span><div class="tt"><span class="num">${esc(best.ip)}</span> · ${esc(cname(n))}</div>`}; }
+    const c = proj.translate();
+    if (!st.flat && (x - c[0]) ** 2 + (y - c[1]) ** 2 > proj.scale() ** 2) return null;
+    const ll = proj.invert([x, y]); if (!ll || !Number.isFinite(ll[0])) return null;
+    const f = countries.find(f => d3.geoContains(f, ll)); if (!f) return null;
+    const n = f.properties.name, a = st.agg && st.agg[n];
+    return {name: n, f, html: `<b>${esc(cname(n))}</b><div class="tt dim">${a ? (a.pct != null ? `${a.pct.toFixed(1)}% מתקיפות האפליקציה בעולם · ` : "") + `${a.scan} כתובות תוקפות · ${a.c2on + a.c2off} שרתי שליטה` : "לא נמדדה פעילות"}</div>`};
+  }
+  function draw(now){
+    const {w, h} = st, t = RM ? 0 : now / 1000;
+    ctx.setTransform(st.dpr, 0, 0, st.dpr, 0, 0); ctx.clearRect(0, 0, w, h); setProj();
+    const c = proj.translate(), R = proj.scale();
+    if (!st.flat) { const g = ctx.createRadialGradient(c[0], c[1], R * .97, c[0], c[1], R * 1.14); g.addColorStop(0, "rgba(255,77,109,.22)"); g.addColorStop(1, "rgba(255,77,109,0)"); ctx.fillStyle = g; ctx.beginPath(); ctx.arc(c[0], c[1], R * 1.14, 0, 7); ctx.fill(); }
+    ctx.beginPath(); path({type: "Sphere"});
+    if (st.flat) ctx.fillStyle = "#07080f"; else { const g = ctx.createRadialGradient(c[0] - R * .35, c[1] - R * .4, R * .05, c[0], c[1], R); g.addColorStop(0, "#171c30"); g.addColorStop(1, "#05060b"); ctx.fillStyle = g; }
+    ctx.fill(); ctx.strokeStyle = "#2f2b47"; ctx.lineWidth = 1; ctx.stroke();
+    ctx.beginPath(); path(GRAT); ctx.strokeStyle = "rgba(130,120,190,.12)"; ctx.lineWidth = .5; ctx.stroke();
+    ctx.beginPath(); path(land); ctx.fillStyle = "#1c1e33"; ctx.fill();
+    if (CL.heat) for (const [f, a] of st.hot) { ctx.beginPath(); path(f); ctx.fillStyle = `rgba(255,59,92,${a})`; ctx.fill(); }
+    ctx.beginPath(); path(borders); ctx.strokeStyle = "rgba(160,150,215,.28)"; ctx.lineWidth = .5; ctx.stroke();
+    if (hover) { ctx.beginPath(); path(hover); ctx.strokeStyle = "rgba(255,255,255,.55)"; ctx.lineWidth = 1; ctx.stroke(); }
+    const sf = st.sel && feat(st.sel); if (sf) { ctx.beginPath(); path(sf); ctx.strokeStyle = "#fff"; ctx.lineWidth = 1.4; ctx.stroke(); }
+    // arcs between leading origin and target countries (only when Cloudflare Radar data exists)
+    for (const a of st.arcs) {
+      const A = proj(a.a), B = proj(a.b), len = A && B ? Math.hypot(A[0] - B[0], A[1] - B[1]) : 0, seg = [];
+      for (let i = 0; i <= 28; i++) { const f = i / 28, ll = a.ip(f); if (!vis(ll)) { seg.push(null); continue; } const p = proj(ll); if (!p) { seg.push(null); continue; }
+        const lift = Math.sin(Math.PI * f); seg.push(st.flat ? [p[0], p[1] - lift * len * .18] : [c[0] + (p[0] - c[0]) * (1 + .22 * lift), c[1] + (p[1] - c[1]) * (1 + .22 * lift)]); }
+      ctx.beginPath(); let pen = false; for (const p of seg) { if (!p) { pen = false; continue; } pen ? ctx.lineTo(p[0], p[1]) : ctx.moveTo(p[0], p[1]); pen = true; }
+      ctx.strokeStyle = "rgba(255,77,109,.35)"; ctx.lineWidth = 1; ctx.stroke();
+      const hp = seg[Math.floor(((t * .28 + a.ph) % 1) * 28)]; if (hp) { ctx.beginPath(); ctx.arc(hp[0], hp[1], 2.2, 0, 7); ctx.fillStyle = "#ffd0d8"; ctx.shadowColor = "#ff4d6d"; ctx.shadowBlur = 8; ctx.fill(); ctx.shadowBlur = 0; }
+    }
+    for (const p of st.pts) {
+      p._v = false; const ll = [p.lon, p.lat]; if (!vis(ll)) continue; const xy = proj(ll); if (!xy) continue; p._x = xy[0]; p._y = xy[1]; p._v = true;
+      const f = (t * .35 + p.ph) % 1;
+      if (p.k === "scan") {
+        if (CL.beam) { const L = p.hh * (st.flat ? Math.min(w, h) * .5 : R), ux = st.flat ? 0 : (xy[0] - c[0]) / R, uy = st.flat ? -1 : (xy[1] - c[1]) / R, tx = xy[0] + ux * L, ty = xy[1] + uy * L;
+          const g = ctx.createLinearGradient(xy[0], xy[1], tx, ty); g.addColorStop(0, "rgba(255,150,90,.9)"); g.addColorStop(1, "rgba(255,150,90,0)");
+          ctx.beginPath(); ctx.moveTo(xy[0], xy[1]); ctx.lineTo(tx, ty); ctx.strokeStyle = g; ctx.lineWidth = 1.3; ctx.stroke();
+          if (!RM) { ctx.beginPath(); ctx.arc(tx + (xy[0] - tx) * f, ty + (xy[1] - ty) * f, 1.5, 0, 7); ctx.fillStyle = "#fff1dc"; ctx.fill(); } }
+        if (CL.scan) { if (!RM) { ctx.beginPath(); ctx.arc(xy[0], xy[1], p.r * (1 + 2.2 * f), 0, 7); ctx.strokeStyle = `rgba(255,77,109,${(.6 * (1 - f)).toFixed(2)})`; ctx.lineWidth = 1; ctx.stroke(); }
+          ctx.beginPath(); ctx.arc(xy[0], xy[1], p.r, 0, 7); ctx.fillStyle = "#ff4d6d"; ctx.shadowColor = "#ff4d6d"; ctx.shadowBlur = 6; ctx.fill(); ctx.shadowBlur = 0; }
+        else p._v = false;
+      } else if (CL.c2) { const s = 4.2; ctx.beginPath(); ctx.moveTo(xy[0], xy[1] - s); ctx.lineTo(xy[0] + s, xy[1]); ctx.lineTo(xy[0], xy[1] + s); ctx.lineTo(xy[0] - s, xy[1]); ctx.closePath();
+        ctx.fillStyle = p.on ? site : "rgba(0,0,0,.5)"; ctx.strokeStyle = site; ctx.lineWidth = 1.3; ctx.shadowColor = site; ctx.shadowBlur = p.on ? 8 : 0; ctx.fill(); ctx.shadowBlur = 0; ctx.stroke(); }
+      else p._v = false;
+    }
+  }
+  function frame(now){
+    st.raf = 0; if (!el.isConnected || el.offsetParent === null) return;
+    const dt = Math.min(64, now - (st.last || now)); st.last = now;
+    if (tween) { const f = Math.min(1, (now - tween.t0) / 800), e = d3.easeCubicInOut(f); st.rot = [tween.a[0] + tween.d[0] * e, tween.a[1] + tween.d[1] * e]; if (f >= 1) tween = null; }
+    else if (st.auto && !drag && now > st.hold) st.rot[0] += dt * .006;
+    draw(now);
+    if (!RM || tween) st.raf = requestAnimationFrame(frame);
+  }
+  function kick(){ if (!st.raf && cv) { st.last = 0; st.raf = requestAnimationFrame(frame); } }
+  function renderBar(){
+    const cy = WORLD.cyber, scan = st.pts.filter(p => p.k === "scan"), c2 = st.pts.filter(p => p.k === "c2");
+    const items = [["scan", "כתובות תוקפות", scan.length, "#ff4d6d"], ["beam", "דיווחי תקיפה מחיישנים", scan.reduce((s, p) => s + (p.n || 0), 0), "#ff965a"], ["c2", "שרתי שליטה", c2.length, site], ["heat", "מדינות מקור", st.rank.length, "#ff3b5c"],
+      [null, "קורבנות כופרה · 24 ש׳", cy.ransom?.n24, "#8f98a8"], [null, "פרצות מנוצלות · 7 ימים", cy.kev?.n7, "#8f98a8"]];
+    bar.innerHTML = items.filter(i => i[2] != null).map(([k, l, v, c]) => k
+      ? `<button type="button" data-gl="${k}" aria-pressed="${CL[k]}" style="--c:${c}" title="הצגה או הסתרה במפה"><b class="num">${nf(v)}</b><span>${l}</span></button>`
+      : `<div style="--c:${c}"><b class="num">${nf(v)}</b><span>${l}</span></div>`).join("");
+  }
+  function renderPanel(){
+    const n = st.sel; if (!n) { panel.hidden = true; return; }
+    const a = st.agg[n], r = st.rank.indexOf(n) + 1, row = (l, v, c) => `<div class="gpr" style="--c:${c}"><span>${l}</span><b class="num">${v}</b></div>`;
+    panel.hidden = false;
+    panel.innerHTML = `<div class="gph"><b>${esc(cname(n))}</b><button type="button" data-g="close" aria-label="סגירת הפאנל">×</button></div>
+      <div class="lbl">${a ? `מקום ${r} מתוך ${st.rank.length} מדינות מקור` : "לא נמדדה מכאן פעילות תקיפה ביממה האחרונה"}</div>` + (a ? `<div class="gprs">`
+      + (a.pct != null ? row("חלק מתקיפות האפליקציה בעולם", a.pct.toFixed(1) + "%", "#ff3b5c") : "")
+      + row("כתובות תוקפות", nf(a.scan), "#ff4d6d") + row("דיווחי תקיפה מחיישנים", nf(a.rep), "#ff965a") + row("שרתי שליטה פעילים", nf(a.c2on), site) + row("שרתי שליטה לא פעילים", nf(a.c2off), "#8f98a8") + `</div>`
+      + (a.ips.length ? `<div class="lbl" style="margin-top:8px">הכתובות הפעילות ביותר</div>` + a.ips.slice(0, 3).map(p => `<div class="gpr ip"><span class="num">${esc(p.ip)}</span><b class="num">${nf(p.n)}</b></div>`).join("") : "") : "")
+      + `<div class="lbl gpf">נתוני היממה האחרונה · SANS DShield, abuse.ch${a && a.pct != null ? ", Cloudflare Radar" : ""}</div>`;
+  }
+  st.select = (n, jump) => {
+    st.sel = n; renderPanel(); const ce = centroid[n];
+    if (ce) { let d0 = (-ce[0] - st.rot[0]) % 360; if (d0 > 180) d0 -= 360; if (d0 < -180) d0 += 360; const b1 = Math.max(-60, Math.min(60, -ce[1] * .8));
+      if (jump) st.rot = [st.rot[0] + d0, b1]; else tween = {a: st.rot.slice(), d: [d0, st.flat ? 0 : b1 - st.rot[1]], t0: performance.now()}; }
+    st.hold = performance.now() + 9000; kick();
+  };
+  st.data = () => {
+    const cy = WORLD?.cyber; if (!cy || !cv) return;
+    const geo = (cy.geo || []).filter(p => Number.isFinite(p.lon) && Number.isFinite(p.lat)), radar = cy.radar?.origin?.length ? cy.radar : null, agg = {};
+    const A = n => agg[n] || (agg[n] = {scan: 0, rep: 0, c2on: 0, c2off: 0, ips: [], heat: 0});
+    for (const p of geo) { const a = A(ISO2[p.cc] || p.cc || "?"); if (p.k === "scan") { a.scan++; a.rep += p.n || 0; a.ips.push(p); a.heat += Math.log10(10 + (p.n || 0)); } else { p.on ? a.c2on++ : a.c2off++; a.heat += 1; } }
+    if (radar) for (const o of radar.origin) { const n = ISO2[o.cc]; if (n) A(n).pct = o.pct; }
+    for (const a of Object.values(agg)) a.ips.sort((x, y) => (y.n || 0) - (x.n || 0));
+    const val = a => radar ? (a.pct || 0) : a.heat, mx = Math.max(1e-6, ...Object.values(agg).map(val));
+    st.agg = agg; st.rank = Object.keys(agg).sort((x, y) => radar ? (agg[y].pct || 0) - (agg[x].pct || 0) || agg[y].rep - agg[x].rep : agg[y].rep - agg[x].rep || agg[y].heat - agg[x].heat);
+    st.hot = countries.filter(f => agg[f.properties.name] && val(agg[f.properties.name]) > 0).map(f => [f, +(0.14 + 0.6 * Math.sqrt(val(agg[f.properties.name]) / mx)).toFixed(2)]);
+    const mxn = Math.log10(1 + Math.max(1, ...geo.map(p => p.n || 0)));
+    st.pts = geo.map((p, i) => ({...p, ph: (i * .618) % 1, r: p.k === "scan" ? 1.8 + Math.min(3.2, Math.log10(1 + (p.n || 1)) * .6) : 4, hh: p.k === "scan" ? .05 + .27 * Math.log10(1 + (p.n || 1)) / mxn : 0}));
+    st.arcs = [];
+    if (radar && radar.target?.length) { let i = 0; for (const o of radar.origin.slice(0, 6)) for (const tg of radar.target.slice(0, 5)) { const a = centroid[ISO2[o.cc]], b = centroid[ISO2[tg.cc]]; if (a && b && a !== b) st.arcs.push({a, b, ip: d3.geoInterpolate(a, b), ph: (i++ * .137) % 1}); } }
+    renderBar();
+    if (st.sel === undefined) { const first = st.rank.find(n => centroid[n]); if (first) st.select(first, true); st.hold = 0; } else renderPanel();
+    kick();
+  };
+  st.build = () => {
+    const w = el.clientWidth; if (!w) return; if (!cv) init();
+    const h = Math.round(Math.max(340, Math.min(660, w * (w < 640 ? .95 : .58))));
+    st.w = w; st.h = h; st.dpr = Math.min(2, window.devicePixelRatio || 1);
+    stage.style.height = h + "px"; cv.width = Math.round(w * st.dpr); cv.height = Math.round(h * st.dpr); cv.style.width = w + "px"; cv.style.height = h + "px";
+    if (!st.agg) st.data(); kick();
+  };
+  return st;
 }
+document.addEventListener("click", e => { const b = e.target.closest("[data-gc]"); if (b && cmap) { cmap.select(b.dataset.gc); $("cm").scrollIntoView({block: "nearest", behavior: "smooth"}); } });
 function renderCyberPanels(){
   const cy = WORLD?.cyber; if (!cy) return;
   const [w, col] = cyLevel(cy.score || 0);
@@ -212,10 +355,11 @@ function renderCyberPanels(){
   // map footer: top countries
   const byC = {}; for (const p of scan) { const n = ISO2[p.cc] || p.cc; byC[n] = (byC[n] || 0) + (p.n || 0); }
   const topC = cy.radar?.origin?.length ? cy.radar.origin.slice(0, 6).map(o => [ISO2[o.cc] || o.name, o.pct.toFixed(1) + "%"]) : Object.entries(byC).sort((a, b) => b[1] - a[1]).slice(0, 6).map(([n, v]) => [n, v.toLocaleString("en-US")]);
-  $("cm-top").innerHTML = `<span class="lbl">מקורות מובילים:</span>` + topC.map(([n, v]) => `<span class="chip">${esc(cname(n))} <span class="num">${v}</span></span>`).join("");
-  $("cm-note").textContent = cy.radar?.origin?.length
-    ? "צבע המדינה: חלקה בתקיפות על אפליקציות ואתרים ביממה האחרונה לפי Cloudflare Radar. הקווים מחברים את מדינות המקור והיעד המובילות. נקודות: כתובות שתוקפות עכשיו (SANS DShield) ושרתי שליטה של בוטנטים (abuse.ch)."
-    : "נקודות אדומות: 100 הכתובות ששלחו הכי הרבה תקיפות וסריקות לחיישני DShield ביממה האחרונה. נקודות סגולות: שרתי שליטה של בוטנטים (abuse.ch Feodo). מיקום הכתובת משוער לפי ip-api. ללא קווים: אין מקור פתוח שמפרסם זוגות מקור־יעד.";
+  $("cm-top").innerHTML = `<span class="lbl">מקורות מובילים:</span>` + topC.map(([n, v]) => `<button type="button" class="chip" data-gc="${esc(n)}">${esc(cname(n))} <span class="num">${v}</span></button>`).join("");
+  $("cm-note").textContent = (cy.radar?.origin?.length
+    ? "צבע המדינה: חלקה בתקיפות על אפליקציות ואתרים ביממה האחרונה לפי Cloudflare Radar. הקשתות מחברות את מדינות המקור והיעד המובילות ומראות נפח, לא תקיפה מסוימת. "
+    : "צבע המדינה: כמה תקיפות יצאו ממנה. אין קשתות בין מדינות, כי אין מקור פתוח שמפרסם זוגות מקור־יעד. ")
+    + "עמוד כתום: כתובת שתוקפת עכשיו, וגובהו לפי מספר הדיווחים לחיישני SANS DShield. מעוין סגול: שרת שליטה של בוטנט (abuse.ch). מיקום הכתובות משוער. לחיצה על מדינה פותחת את הנתונים שלה.";
   // ransomware
   if (rw) {
     const gmx = Math.max(1, ...rw.groups.map(g => g[1]));
@@ -306,11 +450,11 @@ async function show(view){
   if (view === "cyber") startStatus();
   try { await getAtlas(); } catch (e) { for (const id of ["wm", "cm"]) $(id).innerHTML = `<div class="empty" style="padding:20px">המפה לא נטענה. בדקי את החיבור ורענני.</div>`; return; }
   if (view === "world") { if (!wmap) { wmap = makeMap($("wm"), {onDraw: drawWorld}); layerButtons("wm-layers", W_LAYERS, WL, () => drawWorld(wmap)); } wmap.build(); }
-  if (view === "cyber") { if (!cmap) { cmap = makeMap($("cm"), {cls: "cy", onDraw: drawCyber}); layerButtons("cm-layers", C_LAYERS, CL, () => drawCyber(cmap)); } cmap.build(); }
+  if (view === "cyber") { if (!cmap) cmap = makeGlobe($("cm")); cmap.build(); }
 }
 const current = () => (location.hash || "#region").slice(1);
 window.addEventListener("hashchange", () => show(current()));
-window.addEventListener("world-data", () => { renderWorldPanels(); renderCyberPanels(); if (wmap?.svg) drawWorld(wmap); if (cmap?.svg) drawCyber(cmap); });
+window.addEventListener("world-data", () => { renderWorldPanels(); renderCyberPanels(); if (wmap?.svg) drawWorld(wmap); cmap?.data(); });
 window.addEventListener("region-data", regionNav);
 for (const id of ["tr-he", "tr-orig"]) document.getElementById(id)?.addEventListener("click", () => setTimeout(() => { renderWorldPanels(); renderCyberPanels(); }, 0));
 show(current());
