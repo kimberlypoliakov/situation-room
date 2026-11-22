@@ -120,3 +120,27 @@ button.chip:hover{color:var(--fg);border-color:var(--dim)}
 @media (max-width:640px){.gpanel{position:static;width:auto;max-width:none;border-radius:0;border-inline:0;backdrop-filter:none}}
 .tabs a.tablink{font-size:11.5px;color:var(--dim);border:1px solid var(--line-2);border-radius:6px;padding:3px 9px;text-decoration:none}
 .tabs a.tablink:hover{color:var(--fg);border-color:var(--dim)}
+
+/* phones */
+@media (max-width:640px){
+  .ph{flex-wrap:wrap;row-gap:8px}
+  .ph h2{flex:1 1 100%}
+  .ph .tabs{flex:1 1 100%;overflow-x:auto;scrollbar-width:none;-webkit-overflow-scrolling:touch;padding-bottom:2px;margin-inline:-14px;padding-inline:14px}
+  .ph .tabs::-webkit-scrollbar{display:none}
+  .ph .tabs button,.ph .tabs a.tablink{flex:0 0 auto;white-space:nowrap;padding:7px 12px;font-size:12.5px}
+  .ph .meta{justify-content:flex-start}
+  .ph h2:has(+ .meta){flex:1 1 auto}
+  .maptools{flex-wrap:nowrap;overflow-x:auto;scrollbar-width:none}
+  .maptools::-webkit-scrollbar{display:none}
+  .maptools>*{flex:0 0 auto;white-space:nowrap}
+  .upgrid{grid-template-columns:repeat(2,minmax(0,1fr))}
+  .upgrid .up{padding:9px 9px;gap:6px;font-size:12px}
+  .gbar{grid-template-columns:repeat(3,minmax(0,1fr))}
+  .gbar>*{padding:8px 4px 7px}
+  .gbar b{font-size:14.5px}
+  .gbar span{font-size:10.5px}
+  .gctl button{width:38px;height:38px;font-size:18px}
+  .gph button{font-size:24px;padding:4px 8px}
+  button.chip{padding:5px 10px;font-size:12px}
+  .live-wrap{aspect-ratio:3/4;max-height:none}
+}

@@ -429,8 +429,9 @@ async function pollStatus(){
   $("up").innerHTML = out.map(r => `<a class="up ${r.lvl >= 3 ? "crit" : r.lvl >= 1 ? "warn" : ""}" href="${U(r.url)}" target="_blank" rel="noopener" title="${esc(r.bad.map(c => c.name + ": " + (ST_HE[c.status] || c.status)).join(" · "))}"><span class="dot ${cls(r.lvl)}"></span><span>${esc(r.name)}</span><small>${word(r)}</small></a>`).join("");
   const incs = out.flatMap(r => r.inc.map(i => ({...i, p: r.name}))).sort((a, b) => String(b.t).localeCompare(String(a.t)));
   $("up-inc").innerHTML = incs.length ? incs.map(i => `<li><a class="t ltr" href="${U(i.url)}" target="_blank" rel="noopener">${esc(i.name)}</a><span class="s"><span class="chip ${i.imp === "critical" || i.imp === "major" || i.imp === "outage" || i.imp === "high" ? "crit" : "warn"}">${esc(i.p)}</span>${i.st ? `<span>${esc(i.st)}</span>` : ""}${i.t ? `<span>${ago(Date.parse(i.t) / 1000)}</span>` : ""}</span></li>`).join("") : `<li class="empty">אין כרגע תקלות פתוחות באף פלטפורמה.</li>`;
-  const down = out.filter(r => r.lvl >= 1).length;
-  $("up-meta").innerHTML = `<span class="chip ${down ? "warn" : "ok"}">${down ? down + " עם תקלה" : "הכול תקין"}</span><span class="chip">נבדק ${new Date().toLocaleTimeString("he-IL", {hour: "2-digit", minute: "2-digit"})}</span>`;
+  const down = out.filter(r => r.lvl >= 1).length, mute = out.filter(r => !r.ok).length;
+  if (mute === out.length) $("up-inc").innerHTML = `<li class="empty">הבדיקה לא הצליחה מהדפדפן הזה. אין מידע על תקלות.</li>`;
+  $("up-meta").innerHTML = `<span class="chip ${down || mute === out.length ? "warn" : "ok"}">${mute === out.length ? "אין מענה" : down ? down + " עם תקלה" : mute ? `תקין · ${mute} לא ענו` : "הכול תקין"}</span><span class="chip">נבדק ${new Date().toLocaleTimeString("he-IL", {hour: "2-digit", minute: "2-digit"})}</span>`;
 }
 let upTimer = null;
 function startStatus(){ if (upTimer) return; pollStatus(); upTimer = setInterval(() => { if (!document.hidden && !$("view-cyber").hidden) pollStatus(); }, 60000); }
