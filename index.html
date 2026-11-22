@@ -313,6 +313,7 @@ details.more[open]>*+*{margin-top:12px}
     <a href="#region" role="tab" data-view="region" aria-selected="true"><b>ישראל והאזור</b><span id="nv-region">טוען…</span></a>
     <a href="#world" role="tab" data-view="world" aria-selected="false"><b>העולם</b><span id="nv-world">טוען…</span></a>
     <a href="#cyber" role="tab" data-view="cyber" aria-selected="false"><b>סייבר עולמי</b><span id="nv-cyber">טוען…</span></a>
+    <a href="#sky" role="tab" data-view="sky" aria-selected="false"><b>התחזית הרוחנית</b><span id="nv-sky">מחשב…</span></a>
   </nav>
   <div id="view-region" class="view">
 
@@ -592,6 +593,28 @@ details.more[open]>*+*{margin-top:12px}
       <div class="ph"><h2 id="h-ws">מקורות העולם והסייבר</h2><span class="meta" id="ws-meta"></span></div>
       <div class="pb"><div class="src wsrc" id="ws"></div></div>
     </section>
+  </div>
+  <div id="view-sky" class="view" hidden>
+    <section class="hero" id="sk-hero" aria-labelledby="h-sk" style="--hc:#b9a6ff">
+      <div class="top"><h2 class="word" id="h-sk" style="margin:0">התחזית הרוחנית</h2><span class="score" id="sk-meta"></span></div>
+      <p class="say" id="sk-say">מחשב את מצב השמיים…</p>
+      <div class="tiles" id="sk-tiles"></div>
+    </section>
+    <section class="panel" aria-labelledby="h-skl">
+      <div class="ph"><h2 id="h-skl">השמיים מול מה שקורה בשטח</h2><span class="meta" id="sk-link-meta"></span></div>
+      <div class="pb"><div class="skbs" id="sk-link"></div>
+        <p class="lbl" style="margin:12px 0 0">״בשמיים״ הוא פירוש לפי המסורת האסטרולוגית. ״בשטח״ הוא הנתון שנמדד בשאר המסכים. כשאין התאמה, כתוב שאין.</p></div>
+    </section>
+    <div class="grid3">
+      <section class="panel" aria-labelledby="h-skp"><div class="ph"><h2 id="h-skp">אסטרולוגיה מערבית · כוכבים והיבטים</h2><span class="meta" id="sk-pl-meta"></span></div><div class="pb" id="sk-pl"></div></section>
+      <section class="panel" aria-labelledby="h-skn"><div class="ph"><h2 id="h-skn">נומרולוגיה, טארוט ולו־שו</h2></div><div class="pb" id="sk-num"></div></section>
+      <section class="panel" aria-labelledby="h-skc"><div class="ph"><h2 id="h-skc">סין · ארבעת העמודים ואי־צ׳ינג</h2></div><div class="pb" id="sk-cn"></div></section>
+    </div>
+    <div class="grid3">
+      <section class="panel" aria-labelledby="h-skk"><div class="ph"><h2 id="h-skk">קבלה · החודש, היום והשם</h2></div><div class="pb" id="sk-kb"></div></section>
+      <section class="panel" aria-labelledby="h-skv"><div class="ph"><h2 id="h-skv">הודו · ג׳יוטיש ומחזור הירח</h2></div><div class="pb" id="sk-vd"></div></section>
+      <section class="panel" aria-labelledby="h-skh"><div class="ph"><h2 id="h-skh">איך זה מחושב</h2></div><div class="pb"><p class="lbl" style="margin:0;line-height:1.6">מיקומי הכוכבים מחושבים בדפדפן שלך לרגע זה ומתעדכנים כל דקה, בלי שרת. התאריך העברי והסיני מגיעים מלוח השנה של הדפדפן, לפי שעון ישראל. מדד ״מתח השמיים״ סופר היבטים קשים בין מאדים, שבתאי, אורנוס ופלוטו, ומשקלל אותם לפי הדיוק שלהם. זו תחזית כללית לעולם. קריאה אישית דורשת תאריך, שעה ומקום לידה, והיא לא מוצגת כאן.</p></div></section>
+    </div>
   </div>
   <footer>נתונים פתוחים בלבד · מתעדכן לבד כל 15 דקות · <span id="ft-upd"></span> · אינו תחליף להנחיות פיקוד העורף</footer>
 </div>
@@ -1161,4 +1184,6 @@ document.addEventListener("visibilitychange", ()=>{ if (!document.hidden) loadAl
 <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.9.0/d3.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/topojson/3.0.2/topojson.min.js"></script>
 <script src="global.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/astronomy-engine@2.1.19/astronomy.browser.min.js"></script>
+<script src="spirit.js"></script>
 </body></html>

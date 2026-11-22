@@ -1,11 +1,12 @@
 name: update
 on:
   schedule:
-    - cron: "*/15 * * * *"   # GitHub may start scheduled runs a few minutes late
+    - cron: "*/15 * * * *"   # GitHub starts these hours apart on free repos; the chain step below keeps the real 15-minute rhythm, this is the watchdog that restarts it
   workflow_dispatch:
   push:
     branches: [main]
 permissions:
+  actions: write    # lets a run start the next one
   contents: write   # only for the keep-alive commit below
   pages: write
   id-token: write
@@ -15,7 +16,7 @@ concurrency:
 jobs:
   build:
     runs-on: ubuntu-latest
-    timeout-minutes: 25
+    timeout-minutes: 40
     environment:
       name: github-pages
       url: ${{ steps.deploy.outputs.page_url }}
@@ -32,8 +33,17 @@ jobs:
       - uses: actions/upload-pages-artifact@v3
         with:
           path: _site
+      - run: sleep 8   # the artifact is sometimes not listed yet right after upload
       - id: deploy
         uses: actions/deploy-pages@v4
+      - name: Chain the next update (every 15 minutes)
+        if: always() && github.ref == 'refs/heads/main'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          sleep 540
+          n=$(gh run list --repo "$GITHUB_REPOSITORY" --workflow update.yml --limit 20 --json status,databaseId -q "[.[] | select(.status != \"completed\" and .databaseId != $GITHUB_RUN_ID)] | length")
+          if [ "$n" = "0" ]; then gh workflow run update.yml --repo "$GITHUB_REPOSITORY" --ref main; fi
       - name: Keep the schedule alive
         # GitHub turns off scheduled workflows after 60 days without a commit; an empty commit every ~45 days prevents that
         run: |

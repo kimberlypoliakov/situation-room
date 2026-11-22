@@ -1,6 +1,6 @@
 /* v5: three views (region / world / cyber), world + cyber maps */
 body{background:radial-gradient(1200px 500px at 85% -10%,#132033 0%,transparent 60%),radial-gradient(900px 420px at -10% 0%,#1a1424 0%,transparent 55%),var(--bg);background-attachment:fixed}
-.views{display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:8px;position:sticky;top:0;z-index:4;padding:8px 0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
+.views{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;position:sticky;top:0;z-index:4;padding:8px 0;background:color-mix(in srgb,var(--bg) 88%,transparent);backdrop-filter:blur(10px);-webkit-backdrop-filter:blur(10px)}
 .views a{display:grid;gap:2px;padding:10px 14px;border-radius:10px;border:1px solid var(--line);background:var(--panel);color:var(--dim);text-decoration:none;min-width:0;transition:border-color .2s,background .2s,color .2s}
 .views a b{font-size:15px;font-weight:700;color:var(--fg)}
 .views a span{font-size:12px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
@@ -144,3 +144,24 @@ button.chip:hover{color:var(--fg);border-color:var(--dim)}
   button.chip{padding:5px 10px;font-size:12px}
   .live-wrap{aspect-ratio:3/4;max-height:none}
 }
+
+/* spiritual forecast */
+.views a[data-view=sky][aria-selected="true"]{border-color:#b9a6ff}
+.views a[data-view=sky][aria-selected="true"] b{color:#b9a6ff}
+.skbs{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px}
+.skb{background:var(--panel-2);border:1px solid var(--line);border-radius:10px;padding:12px 14px;min-width:0}
+.skb h3{margin:0 0 8px;font-size:15px;display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+.skb p{margin:6px 0 0;font-size:13.5px;line-height:1.55}
+.skb p .lbl{display:inline-block;min-width:52px;margin-inline-end:6px;color:#b9a6ff}
+.skb p+p .lbl{color:var(--accent)}
+.skr{padding:6px 0;border-bottom:1px solid var(--line);font-size:13px}
+.skn{margin:2px 0 6px;line-height:1.5}
+#view-sky .gpr{font-size:13.5px;align-items:baseline}
+#view-sky .gpr b{text-align:end}
+.cjk{font-size:17px;letter-spacing:1px}
+.loshu{display:grid;grid-template-columns:repeat(3,44px);gap:4px;direction:ltr}
+.loshu span{height:44px;display:grid;place-items:center;border:1px solid var(--line-2);border-radius:6px;color:var(--dim);position:relative;opacity:.45}
+.loshu span.on{opacity:1;color:var(--fg);border-color:#b9a6ff;background:color-mix(in srgb,#b9a6ff 12%,transparent)}
+.loshu i{position:absolute;inset-inline-end:3px;bottom:1px;font-size:9px;font-style:normal;color:#b9a6ff}
+@media (max-width:720px){.skbs{grid-template-columns:minmax(0,1fr)}}
+@media (max-width:640px){.views{grid-template-columns:repeat(2,minmax(0,1fr))}}

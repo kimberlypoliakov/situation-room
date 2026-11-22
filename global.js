@@ -444,10 +444,10 @@ function regionNav(){
   $("ft-upd").textContent = "עודכן " + ago(SNAP.ts);
 }
 async function show(view){
-  if (!["region", "world", "cyber"].includes(view)) view = "region";
+  if (!["region", "world", "cyber", "sky"].includes(view)) view = "region";
   document.querySelectorAll(".view").forEach(v => v.hidden = v.id !== "view-" + view);
   document.querySelectorAll("[data-view]").forEach(a => a.setAttribute("aria-selected", a.dataset.view === view));
-  if (view === "region") return;
+  if (view === "region" || view === "sky") return;
   if (view === "cyber") startStatus();
   try { await getAtlas(); } catch (e) { for (const id of ["wm", "cm"]) $(id).innerHTML = `<div class="empty" style="padding:20px">המפה לא נטענה. בדקי את החיבור ורענני.</div>`; return; }
   if (view === "world") { if (!wmap) { wmap = makeMap($("wm"), {onDraw: drawWorld}); layerButtons("wm-layers", W_LAYERS, WL, () => drawWorld(wmap)); } wmap.build(); }

@@ -118,7 +118,7 @@ def main():
     items = list(cache.items())[-CACHE_MAX:]
     dump(dict(items), os.path.join(DATA, "tr.json"))
     dump({"ts": int(time.time()), "region": ok_region, "world": ok_world}, os.path.join(DATA, "status.json"))
-    for f in ("index.html", "global.js", "global.css"): shutil.copy(os.path.join(HERE, f), os.path.join(SITE, f))
+    for f in ("index.html", "global.js", "global.css", "spirit.js"): shutil.copy(os.path.join(HERE, f), os.path.join(SITE, f))
     open(os.path.join(SITE, ".nojekyll"), "w").close()
     if not (ok_region or ok_world or prev_snap): sys.exit("nothing collected and nothing to fall back to")
 
