@@ -333,16 +333,8 @@ details.more[open]>*+*{margin-top:12px}
 
   <details class="more" id="more">
     <summary>כל הפרטים <span>מפה, מדד מפורט, חדשות, שווקים ומקורות</span></summary>
-  <div class="trbar"><span>כותרות בשפה זרה:</span><div class="tabs" role="group" aria-label="שפת הכותרות"><button type="button" id="tr-he" aria-pressed="true">בעברית</button><button type="button" id="tr-orig" aria-pressed="false">בשפת המקור</button></div><span class="lbl">התרגום אוטומטי ועלול לא לדייק. כותרת שעוד לא תורגמה מוצגת בשפת המקור.</span></div>
   <div class="ticker" id="ticker" aria-label="שווקים"><span class="empty">מחירי שוק יופיעו כאן אחרי העדכון הראשון.</span></div>
-  <section class="panel" aria-labelledby="h-tl">
-    <div class="ph"><h2 id="h-tl">ציר זמן · 48 השעות האחרונות</h2>
-      <div class="tabs" role="group" aria-label="סינון ציר הזמן"><button type="button" data-tl="all" aria-pressed="true">הכול</button><button type="button" data-tl="fire" aria-pressed="false">ירי ותקיפות</button><button type="button" data-tl="alert" aria-pressed="false">אזעקות</button><button type="button" data-tl="other" aria-pressed="false">חריגות ואחר</button></div></div>
-    <div class="pb"><div class="scroll-y" style="max-height:440px"><div class="tl" id="tl"><div class="empty">ציר הזמן יתמלא מסבב האיסוף הבא.</div></div></div>
-      <div class="lbl" style="margin-top:8px">אירועים עם שעה ידועה בלבד: אזעקות, דיווחי ירי ותקיפה, רעידות אדמה ליד אתרים, חריגות שזוהו ושינויי רמה במדד. דיווח ממקור אחד מסומן "מקור יחיד".</div></div>
-  </section>
-  
-
+  <div class="trbar"><span>כותרות בשפה זרה:</span><div class="tabs" role="group" aria-label="שפת הכותרות"><button type="button" id="tr-he" aria-pressed="true">בעברית</button><button type="button" id="tr-orig" aria-pressed="false">בשפת המקור</button></div><span class="lbl">התרגום אוטומטי ועלול לא לדייק. כותרת שעוד לא תורגמה מוצגת בשפת המקור.</span></div>
   <div class="grid">
     <div class="col">
       <section class="panel" aria-labelledby="h-idx">
@@ -424,6 +416,14 @@ details.more[open]>*+*{margin-top:12px}
       </section>
     </div>
   </div>
+
+  <section class="panel" aria-labelledby="h-tl">
+    <div class="ph"><h2 id="h-tl">ציר זמן · 48 השעות האחרונות</h2>
+      <div class="tabs" role="group" aria-label="סינון ציר הזמן"><button type="button" data-tl="all" aria-pressed="true">הכול</button><button type="button" data-tl="fire" aria-pressed="false">ירי ותקיפות</button><button type="button" data-tl="alert" aria-pressed="false">אזעקות</button><button type="button" data-tl="other" aria-pressed="false">חריגות ואחר</button></div></div>
+    <div class="pb"><div class="scroll-y" style="max-height:440px"><div class="tl" id="tl"><div class="empty">ציר הזמן יתמלא מסבב האיסוף הבא.</div></div></div>
+      <div class="lbl" style="margin-top:8px">אירועים עם שעה ידועה בלבד: אזעקות, דיווחי ירי ותקיפה, רעידות אדמה ליד אתרים, חריגות שזוהו ושינויי רמה במדד. דיווח ממקור אחד מסומן "מקור יחיד".</div></div>
+  </section>
+  
 
   <div class="grid2">
     <section class="panel newscol" aria-labelledby="h-news">
@@ -1156,6 +1156,7 @@ function renderHero(){
   if (b) tile(4, b.foreign, b.foreign ? `טיסות של חברות זרות בוטלו היום, מתוך ${b.total}` : `אין ביטולים של חברות זרות היום (${b.total} טיסות)`, b.foreign>=5 ? "hot" : b.foreign ? "mid" : "");
   else tile(4, "—", "המקור לא ענה");
 }
+if (matchMedia("(min-width:1180px)").matches) $("more").open = true;   // wide screens open straight into the full dashboard
 $("more").addEventListener("toggle", ()=>{ if ($("more").open && SNAP) requestAnimationFrame(drawMap); });
 
 for (const [id,mode] of [["tr-he","he"],["tr-orig","orig"]]) $(id).addEventListener("click", ()=>{ trMode = mode; try { localStorage.setItem("trMode", mode); } catch(e){} syncTr(); renderAll(); });
